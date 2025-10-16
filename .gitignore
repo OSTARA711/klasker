@@ -1,15 +1,1 @@
-# Build artifacts
-/build/
-*.o
-*.a
-*.so
-*.swp
-
-# Meson
-/meson-private/
-/subprojects/
-/compile_commands.json
-
-# OS junk
-.DS_Store
-Thumbs.db
+<paste above>
