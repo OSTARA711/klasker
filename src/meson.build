@@ -1,4 +1,5 @@
 executable('klasker',
-  sources: ['main.c', 'net.c', 'html.c'],
+  ['main.c', 'net.c', 'html.c'],
+  include_directories: include_directories('../include'),
   dependencies: [gtkdep, soupdep, gumbodep]
 )
