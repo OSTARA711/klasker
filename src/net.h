@@ -1,4 +1,8 @@
-#pragma once
-#include <glib.h>
+#ifndef NET_H
+#define NET_H
 
-void klasker_fetch_async(const char *url);
+#include <gtk/gtk.h>
+
+void klasker_fetch_url(const gchar *url, GtkTextView *text_view);
+
+#endif /* NET_H */
