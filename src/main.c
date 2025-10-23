@@ -1,6 +1,9 @@
 #include "main.h"
 #include "html.h"
 #include "net.h"
+#include <libsoup/soup.h>
+
+SoupSession *klasker_session = NULL;  /* define the global */
 
 GtkWidget *entry;
 GtkWidget *text_view;
@@ -52,7 +55,13 @@ static GtkWidget *create_main_window(void) {
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
     GtkWidget *window = create_main_window();
+    /* create a single shared SoupSession for the lifetime of the app */
+    klasker_session = soup_session_new();
     gtk_widget_show_all(window);
     gtk_main();
+    if (klasker_session) {
+    g_object_unref(klasker_session);
+    klasker_session = NULL;
+    }
     return 0;
 }
