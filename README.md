@@ -64,6 +64,11 @@ users, developers and contributors endorse or created your final software.
 
 ****************************************************************************************************
 
+NOTE: The following statements express our ethical vision and expectations regarding
+what we consider to be fair use and reciprocity within the FOSS community. They are
+only moral and NOT legally binding, in other words, the following moral considerations
+(as harsh as it may sound) do not modify our Apache License 2.0 terms & conditions.
+
 ## MORAL CONSIDERATIONS
 
 You fork our source code (use our binaries) to build your own company's software.
@@ -72,12 +77,14 @@ as it could help other companies and individuals. This is strongly encouraged,
 but not required, as we understand that not all companies can afford to do this.
 
 You fork our source code to build a product that you will then sell worldwide,
-trademark it as your own (did you wrote a single line of code, at least??),
-commercialise it under your own brand and earn money from our hard labour.
-In that case, WE THINK THAT YOU MUST PAY BACK OR CONTRIBUTE BACK TO FOSS.
+trademark it as your own (but did you wrote a single line of code, at least??),
+you commercialise it under your own brand and earn money from our hard labour.
+In that case, while this is not a legal requirement under the Apache License 2.0,
+we strongly believe that those who benefit commercially from this software should
+give back to the FOSS community, either by publicly sharing their improvements of
+the original source code or by supporting the Klasker GTK Browser project financially.
 
-There are two ways to do so: by sharing your own source code with the FOSS community
-or by buying a commercial license from us, so that we can use & invest the money in
+You can buy a commercial license from us, yes! So that we can use & invest the money in
 the Klasker GTK Browser software and other projects, which benefits the whole community.
 
 We want the Klasker GTK Browser to have a long-term impact and to be safely widespread.
