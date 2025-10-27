@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to Klasker will be documented in this file.
+All notable changes to Klasker GTK Browser will be documented in this file.
+
+NOTE: The likelihood that this is the only project on which we will ever work is pretty low and as we engage with exciting new projects, we tend to forget concepts in previous work. When it comes time to revisit this past work, it will take time to remember everything that was done. Furthermore, if someone else comes on board between the time when we started to build this project and when we resume the work on it, they will have to read through the source code and whatever notes (have we left any?) we may have written inline, in order to understand what was done already and what still needs to be done... adding to the amount of time it takes to complete a project of this magnitude.
+
+A good changelog also tells our users & contributors which improvements they will get from an upgrade.
+
+
 
 ## [Alpha 1.0] - 2025-10-22
 - Initial release of Klasker browser
