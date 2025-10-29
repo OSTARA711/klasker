@@ -34,7 +34,7 @@ A good changelog also tells our users & contributors which improvements they wil
 
 - Gumbo HTML parser integrated (gumbo 0.10.1)
 - HTML documents are now parsed into DOM trees, enabling text node and tag extraction.
-- Browser currently extracts titles and major textual nodes such as <p>, <a>, and <h1> elements.
+- Browser currently extracts titles and major textual nodes such as Paragraph, Hyperlink, and Title elements.
 
   ### RAM performance optimized:
 - Idle consumption reduced to ~34.4 MB, page load peaks smoother (avg. ≈ 100 MB) with better stability and reduced GC churn.
