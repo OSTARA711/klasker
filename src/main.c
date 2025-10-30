@@ -3,11 +3,11 @@
 #include "net.h"
 #include <libsoup/soup.h>
 
-SoupSession *klasker_session = NULL;  /* define the global */
-
+/* Global GTK widgets */
 GtkWidget *entry;
 GtkWidget *text_view;
 
+/* Callback for Fetch button */
 static void on_fetch_clicked(GtkButton *button, gpointer user_data) {
     (void)button; // silence unused warning
     GtkTextView *view = GTK_TEXT_VIEW(user_data);
@@ -18,6 +18,7 @@ static void on_fetch_clicked(GtkButton *button, gpointer user_data) {
     }
 }
 
+/* Build main GTK window */
 static GtkWidget *create_main_window(void) {
     GtkWidget *window, *vbox, *hbox, *fetch_button, *scrolled_window;
 
@@ -28,16 +29,18 @@ static GtkWidget *create_main_window(void) {
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_container_add(GTK_CONTAINER(window), vbox);
 
+    /* URL entry + Fetch button */
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
     entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "Enter URL (e.g. https://example.org)");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "Enter URL...");
     gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 0);
 
     fetch_button = gtk_button_new_with_label("Fetch");
     gtk_box_pack_start(GTK_BOX(hbox), fetch_button, FALSE, FALSE, 0);
 
+    /* Text view for HTML display */
     text_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(text_view), FALSE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(text_view), GTK_WRAP_WORD);
@@ -46,6 +49,7 @@ static GtkWidget *create_main_window(void) {
     gtk_container_add(GTK_CONTAINER(scrolled_window), text_view);
     gtk_box_pack_start(GTK_BOX(vbox), scrolled_window, TRUE, TRUE, 0);
 
+    /* Signals */
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(fetch_button, "clicked", G_CALLBACK(on_fetch_clicked), text_view);
 
@@ -54,14 +58,14 @@ static GtkWidget *create_main_window(void) {
 
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
+
+    /* Initialize network subsystem */
+    klasker_net_init();
+
     GtkWidget *window = create_main_window();
-    /* create a single shared SoupSession for the lifetime of the app */
-    klasker_session = soup_session_new();
     gtk_widget_show_all(window);
+
     gtk_main();
-    if (klasker_session) {
-    g_object_unref(klasker_session);
-    klasker_session = NULL;
-    }
+
     return 0;
 }

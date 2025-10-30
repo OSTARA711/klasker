@@ -1,6 +1,8 @@
-#ifndef NET_H
-#define NET_H
+#ifndef KLASKER_NET_H
+#define KLASKER_NET_H
 
-void klasker_fetch_async(void);
+#include <gtk/gtk.h>
+
+void klasker_fetch_url(const gchar *url, GtkTextView *text_view);
 
 #endif

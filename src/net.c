@@ -1,18 +1,30 @@
-// src/net.c
 #include "main.h"
+#include "html.h"     // for klasker_display_html()
+#include "net.h"
+
 #include <glib.h>
-#include <glib/gstdio.h>
 #include <libsoup/soup.h>
 #include <string.h>
 
-/* A small container struct to pass result to the main thread */
+/* -------------------------------------------------------
+ *  Global SoupSession (shared by all network operations)
+ * ------------------------------------------------------- */
+static SoupSession *klasker_session = NULL;
+
+/* Initialize the shared session once */
+void klasker_net_init(void) {
+    if (!klasker_session)
+        klasker_session = soup_session_new();
+}
+
+/* Container for transferring data to the main GTK thread */
 typedef struct {
-    gchar *body;            // owned, must be freed
+    gchar *body;
     gint status;
-    GtkTextView *view;      // not owned, used on main thread only
+    GtkTextView *view;
 } FetchResult;
 
-/* Free the fetch result */
+/* Cleanup helper */
 static void fetch_result_free(gpointer data) {
     FetchResult *r = data;
     if (!r) return;
@@ -20,102 +32,75 @@ static void fetch_result_free(gpointer data) {
     g_free(r);
 }
 
-/* This runs on the main thread (via g_idle_add). It updates UI and calls display. */
-static gboolean fetch_idle_cb(gpointer data) {
-    FetchResult *r = data;
-    if (!r) return G_SOURCE_REMOVE;
+/* -------------------------------------------------------
+ *  Fetch completed (runs on main GTK thread)
+ * ------------------------------------------------------- */
+static gboolean fetch_idle_cb(gpointer user_data) {
+    FetchResult *result = user_data;
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(result->view);
 
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(r->view);
+    gtk_text_buffer_set_text(buffer, "", -1);  // clear previous content
 
-    if (r->status == SOUP_STATUS_OK && r->body && *r->body) {
-        /* Replace buffer contents with the page (or delegate to DOM renderer) */
-        /* klasker_display_html should free or copy as needed; we pass pointer (it won't free it) */
-        klasker_display_html(r->body, r->view);
+    if (result->status == SOUP_STATUS_OK && result->body) {
+        klasker_display_html(result->body, GTK_TEXT_VIEW(result->view));
     } else {
-        gchar msg[256];
-        g_snprintf(msg, sizeof(msg), "Fetch failed (status %d)\n", r->status);
+        gchar *msg = g_strdup_printf("HTTP Error: %d", result->status);
         gtk_text_buffer_set_text(buffer, msg, -1);
+        g_free(msg);
     }
 
-    /* free result */
-    fetch_result_free(r);
+    fetch_result_free(result);
     return G_SOURCE_REMOVE;
 }
 
-/* Worker thread: performs a synchronous fetch using the shared session. */
-static gpointer fetch_thread_func(gpointer user_data) {
-    /* user_data is a struct containing the url and the GtkTextView pointer */
-    struct {
-        gchar *url;
-        GtkTextView *view;
-    } *task = user_data;
+/* -------------------------------------------------------
+ *  Threaded fetch (runs in worker thread)
+ * ------------------------------------------------------- */
+static gpointer fetch_thread_func(gpointer data) {
+    FetchResult *result = data;
 
-    FetchResult *result = g_new0(FetchResult, 1);
-    result->body = NULL;
-    result->status = 0;
-    result->view = task->view;
-
-    SoupMessage *msg = soup_message_new("GET", task->url);
+    SoupMessage *msg = soup_message_new("GET", result->body);
     if (!msg) {
-        result->status = -1;
+        result->status = SOUP_STATUS_MALFORMED;
+        result->body = g_strdup("Invalid URL");
         g_idle_add(fetch_idle_cb, result);
-        g_free(task->url);
-        g_free(task);
         return NULL;
     }
 
-    /* Send synchronously on the shared session (this blocks the worker thread only) */
-    soup_session_send_message(klasker_session, msg);
+    SoupMessage *res = msg;
+    result->status = soup_session_send_message(klasker_session, res);
 
-    result->status = msg->status_code;
+    if (result->status == SOUP_STATUS_OK && res->response_body && res->response_body->data) {
+    result->body = g_strdup(res->response_body->data);
 
-    if (msg->response_body && msg->response_body->data) {
-        /* duplicate the response body into a normal C string */
-        result->body = g_strdup((const char *)msg->response_body->data);
+    // Debug: print first few chars of response to console
+    g_print("[Klasker] Downloaded %zu bytes\n", strlen(result->body));
+    g_print("[Klasker] First 200 chars:\n%.200s\n\n", result->body);
+
     } else {
-        result->body = g_strdup("");
+        result->body = g_strdup_printf("HTTP Error: %d", result->status);
     }
 
-    /* IMPORTANT: destroy Gumbo output if you parse later.
-       We don't parse here; parsing should be done on main thread (or produce a separate workflow). */
-
-    /* unref message (we created it above) */
-    g_object_unref(msg);
-
-    /* schedule UI update on main loop */
     g_idle_add(fetch_idle_cb, result);
 
-    /* cleanup */
-    g_free(task->url);
-    g_free(task);
+    g_object_unref(msg);
     return NULL;
 }
 
-/* Public: start an async fetch (spawns worker thread). */
-void klasker_fetch_url(const gchar *url, GtkTextView *view) {
-    if (!url || !*url) return;
+/* -------------------------------------------------------
+ *  Public function to start a fetch
+ * ------------------------------------------------------- */
+void klasker_fetch_url(const gchar *url, GtkTextView *text_view) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(text_view);
+    gtk_text_buffer_set_text(buffer, "Fetching...", -1);
 
-    GtkTextBuffer *buffer = gtk_text_view_get_buffer(view);
-    gtk_text_buffer_set_text(buffer, "Fetching...\n", -1);
+    if (!url || !*url)
+        return;
 
-    /* Define a struct type for the task explicitly */
-    typedef struct {
-        gchar *url;
-        GtkTextView *view;
-    } FetchTask;
+    FetchResult *result = g_new0(FetchResult, 1);
+    result->body = g_strdup(url);   // temporarily holds URL until thread reads it
+    result->status = 0;
+    result->view = text_view;
 
-    FetchTask *task = g_new0(FetchTask, 1);
-    task->url = g_strdup(url);
-    task->view = view;
-
-    GError *err = NULL;
-    if (!g_thread_try_new("klasker-fetch-thread", fetch_thread_func, task, &err)) {
-        gchar msg[256];
-        g_snprintf(msg, sizeof(msg), "Failed to start fetch thread: %s\n",
-                   err ? err->message : "unknown");
-        gtk_text_buffer_set_text(buffer, msg, -1);
-        g_clear_error(&err);
-        g_free(task->url);
-        g_free(task);
-    }
+    g_thread_new("klasker-fetch", fetch_thread_func, result);
 }

@@ -1,99 +1,66 @@
 #include "document.h"
 #include <string.h>
 
-static void klasker_extract_nodes(GumboNode *node, KlDocument *doc);
-
-static gchar *get_node_text(GumboNode *node) {
-    if (node->type == GUMBO_NODE_TEXT)
-        return g_strdup(node->v.text.text);
-
-    if (node->type != GUMBO_NODE_ELEMENT)
-        return NULL;
-
-    GString *result = g_string_new(NULL);
-    const GumboVector *children = &node->v.element.children;
-    for (unsigned i = 0; i < children->length; ++i) {
-        gchar *child_text = get_node_text(children->data[i]);
-        if (child_text) {
-            g_string_append(result, child_text);
-            g_free(child_text);
-        }
-    }
-    return g_string_free(result, FALSE);
-}
-
+/*
+ * Internal recursive function to extract <a> and <img> attributes.
+ */
 static void klasker_extract_nodes(GumboNode *node, KlDocument *doc) {
-    if (!node || node->type != GUMBO_NODE_ELEMENT)
+    if (node->type != GUMBO_NODE_ELEMENT)
         return;
 
-    GumboTag tag = node->v.element.tag;
-    KlNode *n = NULL;
+    GumboElement *element = &node->v.element;
+    // const gchar *tag_name = gumbo_normalized_tagname(element->tag);
 
-    if (tag == GUMBO_TAG_P) {
-        n = g_new0(KlNode, 1);
-        n->type = KL_NODE_PARAGRAPH;
-        n->text = get_node_text(node);
-    } else if (tag == GUMBO_TAG_A) {
-        n = g_new0(KlNode, 1);
-        n->type = KL_NODE_LINK;
-        n->text = get_node_text(node);
-    } else if (tag == GUMBO_TAG_H1) {
-        n = g_new0(KlNode, 1);
-        n->type = KL_NODE_HEADING;
-        n->text = get_node_text(node);
-    }
-
-    if (n && n->text && *n->text)
-        doc->nodes = g_list_append(doc->nodes, n);
-    else if (n)
-        g_free(n);
-
-    // Recurse
-    const GumboVector *children = &node->v.element.children;
-    for (unsigned i = 0; i < children->length; ++i)
-        klasker_extract_nodes(children->data[i], doc);
-}
-
-KlDocument *klasker_document_parse(const gchar *html) {
-    if (!html) return NULL;
-
-    GumboOutput *output = gumbo_parse(html);
-    KlDocument *doc = g_new0(KlDocument, 1);
-
-    // --- Title ---
-    const GumboVector *root_children = &output->root->v.element.children;
-    for (unsigned i = 0; i < root_children->length; ++i) {
-        GumboNode *node = root_children->data[i];
-        if (node->type == GUMBO_NODE_ELEMENT && node->v.element.tag == GUMBO_TAG_HEAD) {
-            const GumboVector *children = &node->v.element.children;
-            for (unsigned j = 0; j < children->length; ++j) {
-                GumboNode *child = children->data[j];
-                if (child->type == GUMBO_NODE_ELEMENT && child->v.element.tag == GUMBO_TAG_TITLE) {
-                    if (child->v.element.children.length > 0) {
-                        GumboNode *text = child->v.element.children.data[0];
-                        if (text->type == GUMBO_NODE_TEXT)
-                            doc->title = g_strdup(text->v.text.text);
-                    }
-                }
-            }
+    if (element->tag == GUMBO_TAG_TITLE) {
+        if (element->children.length > 0) {
+            GumboNode *text_node = element->children.data[0];
+            if (text_node->type == GUMBO_NODE_TEXT)
+                doc->title = g_strdup(text_node->v.text.text);
         }
     }
 
-    // --- Extract content nodes ---
+    if (element->tag == GUMBO_TAG_A) {
+        GumboAttribute *href = gumbo_get_attribute(&element->attributes, "href");
+        if (href)
+            doc->links = g_list_append(doc->links, g_strdup(href->value));
+    }
+
+    if (element->tag == GUMBO_TAG_IMG) {
+        GumboAttribute *src = gumbo_get_attribute(&element->attributes, "src");
+        if (src)
+            doc->images = g_list_append(doc->images, g_strdup(src->value));
+    }
+
+    // Recurse into children
+    for (unsigned int i = 0; i < element->children.length; i++)
+        klasker_extract_nodes(element->children.data[i], doc);
+}
+
+/*
+ * Main parsing entry point.
+ */
+KlDocument *klasker_document_parse(const gchar *html) {
+    if (!html)
+        return NULL;
+
+    KlDocument *doc = g_new0(KlDocument, 1);
+    GumboOutput *output = gumbo_parse(html);
+
     klasker_extract_nodes(output->root, doc);
     gumbo_destroy_output(&kGumboDefaultOptions, output);
+
     return doc;
 }
 
+/*
+ * Memory cleanup.
+ */
 void klasker_document_free(KlDocument *doc) {
-    if (!doc) return;
-    g_free(doc->title);
+    if (!doc)
+        return;
 
-    for (GList *l = doc->nodes; l; l = l->next) {
-        KlNode *n = l->data;
-        g_free(n->text);
-        g_free(n);
-    }
-    g_list_free(doc->nodes);
+    g_free(doc->title);
+    g_list_free_full(doc->links, g_free);
+    g_list_free_full(doc->images, g_free);
     g_free(doc);
 }

@@ -4,23 +4,23 @@
 #include <glib.h>
 #include <gumbo.h>
 
-typedef enum {
-    KL_NODE_PARAGRAPH,
-    KL_NODE_HEADING,
-    KL_NODE_LINK
-} KlNodeType;
-
-typedef struct {
-    KlNodeType type;
-    gchar *text;
-} KlNode;
-
+/*
+ * Represents a lightweight parsed HTML document.
+ */
 typedef struct {
     gchar *title;
-    GList *nodes;  // list of KlNode*
+    GList *links;   // list of gchar* hrefs
+    GList *images;  // list of gchar* srcs
 } KlDocument;
 
+/*
+ * Parse HTML into a KlDocument.
+ */
 KlDocument *klasker_document_parse(const gchar *html);
+
+/*
+ * Free all memory associated with the document.
+ */
 void klasker_document_free(KlDocument *doc);
 
 #endif /* KLASKER_DOCUMENT_H */

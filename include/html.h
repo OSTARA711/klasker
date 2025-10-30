@@ -1,6 +1,12 @@
-#ifndef HTML_H
-#define HTML_H
+#ifndef KLASKER_HTML_H
+#define KLASKER_HTML_H
 
-void klasker_parse_html(const char *html);
+#include <gtk/gtk.h>
 
-#endif
+/*
+ * Renders parsed HTML into a GtkTextView.
+ * The actual parsing is handled by document.c via klasker_document_parse().
+ */
+void klasker_display_html(const gchar *html, GtkTextView *text_view);
+
+#endif /* KLASKER_HTML_H */
