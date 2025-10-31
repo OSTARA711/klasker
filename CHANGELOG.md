@@ -8,6 +8,23 @@ A good changelog also tells our users & contributors which improvements they wil
 
 
 
+## [Alpha 1.2] - 2025-10-31
+### Added Features
+- Initial networking core with `SoupSession` and asynchronous URL fetching.
+- HTML parsing using Gumbo and plain-text display in GtkTextView.
+- Extraction of basic links displayed as `[Link: ...]`.
+
+### Known Issues / Limitations
+- Links are currently displayed as `[Link: ...]` instead of clickable, styled elements.
+- Some websites (e.g., iana.org help pages) return "HTTP Error: 403" due to user-agent or headers restrictions.
+
+### Next Phase: Clickable Links
+- Objective: Implement realistic clickable links in the text view.
+- Visual: Link titles in **blue**, without `[Link: ...]` prefix.
+- Behavior: Clicking a link should trigger `klasker_fetch_url()` for the linked page.
+- Parsing: Possibly extend `klasker_parse_document()` to store link targets alongside text.
+
+
 ## [Alpha 1.1] – 2025-10-30
 
 - Improved HTML Processing and Parsing Layer
