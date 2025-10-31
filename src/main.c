@@ -1,7 +1,8 @@
+#include <gtk/gtk.h>
 #include "main.h"
 #include "html.h"
-#include "net.h"
-#include <libsoup/soup.h>
+#include "klasker-net.h"
+#include "klasker-document.h"
 
 /* Global GTK widgets */
 GtkWidget *entry;
