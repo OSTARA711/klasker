@@ -4,6 +4,7 @@ executable('klasker',
     'net.c',
     'html.c',
     'document.c',
+    'klasker-net.c',
   ],
   include_directories: include_directories('../include'),
   dependencies: [

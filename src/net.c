@@ -1,33 +1,9 @@
+#include "html.h"
 #include "klasker-net.h"
-#include "html.h"     // for klasker_display_html()
-
 #include <glib.h>
 #include <libsoup/soup.h>
 #include <string.h>
-
-/* -------------------------------------------------------
- *  Global SoupSession shared across all network operations
- * ------------------------------------------------------- */
-static SoupSession *klasker_session = NULL;
-
-/* Initialize session (call once at startup) */
-void klasker_net_init(void) {
-    if (!klasker_session)
-        klasker_session = soup_session_new();
-}
-
-/* Cleanup session at exit */
-void klasker_net_cleanup(void) {
-    if (klasker_session) {
-        g_object_unref(klasker_session);
-        klasker_session = NULL;
-    }
-}
-
-/* Getter for other modules to access the session */
-SoupSession *klasker_get_session(void) {
-    return klasker_session;
-}
+#include <gtk/gtk.h>
 
 /* -------------------------------------------------------
  *  Data container for async fetches
@@ -39,7 +15,6 @@ typedef struct {
     GtkTextView *view;
 } FetchResult;
 
-/* Free a FetchResult */
 static void fetch_result_free(gpointer data) {
     FetchResult *r = data;
     if (!r) return;
@@ -49,13 +24,13 @@ static void fetch_result_free(gpointer data) {
 }
 
 /* -------------------------------------------------------
- *  Callback: runs on the main GTK thread after fetch completes
+ *  Callback (main GTK thread)
  * ------------------------------------------------------- */
 static gboolean fetch_idle_cb(gpointer user_data) {
     FetchResult *result = user_data;
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(result->view);
 
-    gtk_text_buffer_set_text(buffer, "", -1);  // clear previous content
+    gtk_text_buffer_set_text(buffer, "", -1);
 
     if (result->status == SOUP_STATUS_OK && result->body) {
         klasker_display_html(result->body, GTK_TEXT_VIEW(result->view));
@@ -70,11 +45,18 @@ static gboolean fetch_idle_cb(gpointer user_data) {
 }
 
 /* -------------------------------------------------------
- *  Worker thread: runs in background to fetch URL
+ *  Worker thread (background fetch)
  * ------------------------------------------------------- */
 static gpointer fetch_thread_func(gpointer data) {
     FetchResult *result = data;
     SoupSession *session = klasker_get_session();
+
+    if (!session) {
+        result->status = SOUP_STATUS_CANT_CONNECT;
+        result->body = g_strdup("Network not initialized.");
+        g_idle_add(fetch_idle_cb, result);
+        return NULL;
+    }
 
     SoupMessage *msg = soup_message_new("GET", result->url);
     if (!msg) {
@@ -90,8 +72,6 @@ static gpointer fetch_thread_func(gpointer data) {
         msg->response_body && msg->response_body->data) {
 
         result->body = g_strdup(msg->response_body->data);
-
-        // Optional debug output
         g_print("[Klasker] Downloaded %zu bytes\n", strlen(result->body));
         g_print("[Klasker] First 200 chars:\n%.200s\n\n", result->body);
 
@@ -105,13 +85,14 @@ static gpointer fetch_thread_func(gpointer data) {
 }
 
 /* -------------------------------------------------------
- *  Public API: start asynchronous fetch
+ *  Public API
  * ------------------------------------------------------- */
 void klasker_fetch_url(const gchar *url, GtkTextView *text_view) {
-    if (!url || !*url) return;
-
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(text_view);
     gtk_text_buffer_set_text(buffer, "Fetching...", -1);
+
+    if (!url || !*url)
+        return;
 
     FetchResult *result = g_new0(FetchResult, 1);
     result->url = g_strdup(url);

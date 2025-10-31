@@ -1,20 +1,38 @@
-#include "klasker-document.h"
+#include "document.h"
+#include "klasker-net.h"
 #include <gumbo.h>
 #include <gtk/gtk.h>
 #include <string.h>
 
-/*
- * Klasker HTML Document Parser
- * ----------------------------
- * Uses the Gumbo parser to extract visible text and key attributes.
- */
+/* Helper: insert text with optional link */
+static void insert_text_with_link(GtkTextBuffer *buffer, const gchar *text, const gchar *href) {
+    GtkTextIter end;
+    gtk_text_buffer_get_end_iter(buffer, &end);
 
+    if (href) {
+        GtkTextTagTable *tag_table = gtk_text_buffer_get_tag_table(buffer);
+        GtkTextTag *link_tag = gtk_text_tag_table_lookup(tag_table, "link");
+        if (!link_tag) {
+            link_tag = gtk_text_buffer_create_tag(buffer,
+                                                 "link",
+                                                 "foreground", "blue",
+                                                 "underline", PANGO_UNDERLINE_SINGLE,
+                                                 NULL);
+        }
+        gtk_text_buffer_insert_with_tags_by_name(buffer, &end, text, -1, "link", NULL);
+        g_object_set_data(G_OBJECT(link_tag), "href", g_strdup(href));
+    } else {
+        gtk_text_buffer_insert(buffer, &end, text, -1);
+    }
+    gtk_text_buffer_insert(buffer, &end, "\n", -1);
+}
+
+/* Recursive traversal of Gumbo nodes */
 static void klasker_traverse_node(GumboNode *node, GtkTextBuffer *buffer) {
+    if (!node) return;
+
     if (node->type == GUMBO_NODE_TEXT) {
-        GtkTextIter end;
-        gtk_text_buffer_get_end_iter(buffer, &end);
-        gtk_text_buffer_insert(buffer, &end, node->v.text.text, -1);
-        gtk_text_buffer_insert(buffer, &end, "\n", -1);
+        insert_text_with_link(buffer, node->v.text.text, NULL);
     } else if (node->type == GUMBO_NODE_ELEMENT) {
         GumboElement *element = &node->v.element;
         GumboTag tag = element->tag;
@@ -25,33 +43,32 @@ static void klasker_traverse_node(GumboNode *node, GtkTextBuffer *buffer) {
             tag == GUMBO_TAG_LINK)
             return;
 
-        // Extract href/src/alt if present
-        GumboVector *attrs = &element->attributes;
-        for (unsigned int i = 0; i < attrs->length; i++) {
-            GumboAttribute *attr = attrs->data[i];
-            if (!attr->name || !attr->value) continue;
-
-            GtkTextIter end;
-            gtk_text_buffer_get_end_iter(buffer, &end);
-            if (strcmp(attr->name, "href") == 0) {
-                gtk_text_buffer_insert(buffer, &end, "[Link: ", -1);
-                gtk_text_buffer_insert(buffer, &end, attr->value, -1);
-                gtk_text_buffer_insert(buffer, &end, "]\n", -1);
-            } else if (strcmp(attr->name, "src") == 0) {
-                gtk_text_buffer_insert(buffer, &end, "[Image src: ", -1);
-                gtk_text_buffer_insert(buffer, &end, attr->value, -1);
-                gtk_text_buffer_insert(buffer, &end, "]\n", -1);
-            } else if (strcmp(attr->name, "alt") == 0) {
-                gtk_text_buffer_insert(buffer, &end, "[Alt: ", -1);
-                gtk_text_buffer_insert(buffer, &end, attr->value, -1);
-                gtk_text_buffer_insert(buffer, &end, "]\n", -1);
+        // Check for <a href="...">
+        const gchar *href = NULL;
+        if (tag == GUMBO_TAG_A) {
+            GumboVector *attrs = &element->attributes;
+            for (unsigned int i = 0; i < attrs->length; i++) {
+                GumboAttribute *attr = (GumboAttribute *)attrs->data[i];
+                if (strcmp(attr->name, "href") == 0) {
+                    href = attr->value;
+                    break;
+                }
             }
         }
 
-        // Recursively traverse children
+        // Traverse children
         GumboVector *children = &element->children;
         for (unsigned int i = 0; i < children->length; i++) {
-            klasker_traverse_node(children->data[i], buffer);
+            GumboNode *child_node = (GumboNode *)children->data[i];
+            if (tag == GUMBO_TAG_A && href) {
+                if (child_node->type == GUMBO_NODE_TEXT) {
+                    insert_text_with_link(buffer, child_node->v.text.text, href);
+                } else {
+                    klasker_traverse_node(child_node, buffer);
+                }
+            } else {
+                klasker_traverse_node(child_node, buffer);
+            }
         }
     }
 }
